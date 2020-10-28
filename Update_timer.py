@@ -40,7 +40,7 @@ def device_level_uptodate(device_id, timer_level):
     cmd = '/json.htm?type=devices&rid=' + device_id
     if request(cmd):
         result = request(cmd)
-        print('true request cmd')
+        print(f'true request cmd = {cmd}')
         if timer_level != result['result'][0]['Level']:
             return True
         else:
@@ -52,16 +52,11 @@ def update_device(device_id, timer_level):
         cmd = '/json.htm?type=command&param=switchlight&idx=' + device_id + '&switchcmd=Set%20Level&level=' + timer_level
         if request(cmd):
             result = request(cmd)
-            print("ok")
-            # return True
+            print(f"commande envoyée : {cmd}")
     else:
         print('device already on good state')
 
 
-# a implémenter :
-# une fonction qui trie par heure croissante
-# puis on vérifie les jours
-# puis on vérifie les heures
 def byTime(obj):
     return obj['Time']
 
@@ -76,7 +71,9 @@ def active_day(list_id):
         # for j in range(len(device_timer['result'])):
         for j, k in enumerate(sort_dtimer):
             print(f"Days = {k['Days']}")
-            if k['Days'] == 128:
+            if k["Active"] == 'false':
+                continue
+            elif k['Days'] == 128:
                 print('Timer actif tous les jours')
                 bin_active_day = '1111111'
             elif k['Days'] == 256:
@@ -119,9 +116,9 @@ def active_hour(device_id, act_days, timer):
                 m = m + 1
                 break
 
-    print(
-        f" i = {m}, a = {act_days[m]}, now time = {now.time()}, str_time = {update_str_time_idx(m, timer, act_days).time()}")
-    # update_device(str(device_id), str(timer[m]['Level']))
+    print(f" i = {m}, a = {act_days[m]}, now time = {now.time()}, str_time = {update_str_time_idx(m, timer, act_days).time()}")
+    print(f"level : {timer[act_days[m]]['Level']}")
+    update_device(str(device_id), str(timer[act_days[m]]['Level']))
 
 
 idx = get_timer_list()
