@@ -2,7 +2,7 @@
 from datetime import datetime
 import requests
 
-host = 'http://127.0.0.1'
+host = 'http://192.168.1.20'
 port = ':9090'
 now = datetime.now()
 
@@ -71,10 +71,10 @@ def active_day(list_id):
         print(f"entré dans la fonction active_timer avec l'ID = {i}")
         d_timer = get_timer(i)
         sort_dtimer = sorted(d_timer['result'], key=byTime)
-        print(f"Il y a {len(sort_dtimer['result'])} timer pour l'idx {i} ")
+        print(f"Il y a {len(sort_dtimer)} timer pour l'idx {i} ")
         timer_day_active = []
         # for j in range(len(device_timer['result'])):
-        for j, k in enumerate(device_timer['result']):
+        for j, k in enumerate(sort_dtimer):
             print(f"Days = {k['Days']}")
             if k['Days'] == 128:
                 print('Timer actif tous les jours')
@@ -94,14 +94,14 @@ def active_day(list_id):
 
         if timer_day_active:
             print(f"ID des timer actifs pour ce jours de la semaine : {timer_day_active}")
-            active_hour(i, timer_day_active, device_timer)
+            active_hour(i, timer_day_active, sort_dtimer)
         print('')
         # ballayer les heure pour trouver l'heure active
 
 
 def update_str_time_idx(index, timer, id_list):
     a = id_list[index]
-    str_time = datetime.strptime(timer['result'][a]['Time'], '%H:%M')
+    str_time = datetime.strptime(timer[a]['Time'], '%H:%M')
     return str_time
 
 
@@ -121,7 +121,7 @@ def active_hour(device_id, act_days, timer):
 
     print(
         f" i = {m}, a = {act_days[m]}, now time = {now.time()}, str_time = {update_str_time_idx(m, timer, act_days).time()}")
-    # update_device(str(device_id), str(timer['result'][m]['Level']))
+    # update_device(str(device_id), str(timer[m]['Level']))
 
 
 idx = get_timer_list()
