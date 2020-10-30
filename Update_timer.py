@@ -6,6 +6,23 @@ host = 'http://192.168.1.20'
 port = ':9090'
 now = datetime.now()
 
+#constants
+MON = 1;
+TUE = 2;
+WED = 4;
+THU = 8;
+FRI = 16;
+SAT = 32;
+SUN = 64;
+EVERYDAYS = 128;
+WEEKDAYS = 256;
+WEEKENDS = 512;
+
+SUM_EVERYDAYS = 127;
+SUM_WEEKDAYS = 31;
+SUM_WEEKENDS = 96;
+
+ONTIME = 2;
 
 def url(json_cmd):
     return host + port + json_cmd
@@ -16,45 +33,57 @@ def request(json_cmd):
     if response.ok:
         return response.json()
 
-
-def get_timer(device_id):
-    str_id = str(device_id)
-    cmd = '/json.htm?idx=' + str_id + '&type=timers'
-    return request(cmd)
-
-
 def get_timer_list():
     cmd = '/json.htm?type=schedules&filter=device'
-    result = request(cmd)
+    timers = request(cmd)['result']
+    print(f"timers:{timers}")
+   
+    #on filtre les timers actifs
+    activeTimers = [timer for timer in timers if timer['Active'] == "true"]
+    
+    print(f"activeTimers:{activeTimers}")
+    
+    deviceID = 0
+    timer_kvp = {}
     timer_list_id = []
+    for timer in activeTimers:
+        ID = timer['DeviceRowID']
+        timer_list_id.append(ID)
+        if deviceID != ID:
+            timer_kvp[ID] = []
+            deviceID = ID
+        
+        timer_kvp[ID].append(timer)
+        
+    print(f"timer_kvp:{timer_kvp}")
 
-    for i in result['result']:
-        timer_list_id.append(i['DeviceRowID'])
-
-    timer_list_id = set(timer_list_id)
-    print(f" timer_list_id = {timer_list_id}")
-    return timer_list_id
+    return timer_kvp
 
 
-def device_level_uptodate(device_id, timer_level):
+def update_device(device_id, trigger):
     cmd = '/json.htm?type=devices&rid=' + device_id
     if request(cmd):
         result = request(cmd)
-        print(f'true request cmd = {cmd}')
-        if timer_level != result['result'][0]['Level']:
-            return True
+        deviceJson =  result['result'][0]
+        #print(f'status {device_id}: {deviceJson} ')
+        
+        status = 'On'
+        prop = 'Status'
+        selectorType = (deviceJson['SwitchType'] == "Selector")
+        if selectorType:
+            prop = 'Level'
+            status = trigger['Level']
         else:
-            return False
-
-
-def update_device(device_id, timer_level):
-    if device_level_uptodate(device_id, timer_level):
-        cmd = '/json.htm?type=command&param=switchlight&idx=' + device_id + '&switchcmd=Set%20Level&level=' + timer_level
-        if request(cmd):
-            result = request(cmd)
-            print(f"commande envoyée : {cmd}")
-    else:
-        print('device already on good state')
+            status = 'On' if trigger['Level']==100 else 'Off'
+            
+        if (status != deviceJson[prop]):    
+            cmd = '/json.htm?type=command&param=switchlight&idx=' + device_id + '&switchcmd=' + ('Set%20Level&level=' if  selectorType else '') + str(status)
+            if request(cmd):
+                #result = request(cmd)
+                print(f'device {device_id} changes to {status} status')
+                # return True
+        else:
+            print(f'device {device_id} already on good state')
 
 
 def byTime(obj):
@@ -62,63 +91,56 @@ def byTime(obj):
 
 
 def active_day(list_id):
-    for i in list_id:
-        print(f"entré dans la fonction active_timer avec l'ID = {i}")
-        d_timer = get_timer(i)
-        sort_dtimer = sorted(d_timer['result'], key=byTime)
-        print(f"Il y a {len(sort_dtimer)} timer pour l'idx {i} ")
-        timer_day_active = []
-        # for j in range(len(device_timer['result'])):
-        for j, k in enumerate(sort_dtimer):
+    day = now.weekday()
+    for id,timers in list_id.items():
+        print(f"entre dans la fonction active_timer avec l'ID = {id}")
+        triggers = sorted(timers, key=byTime)
+        print(f"Il y a {len(triggers)} timer pour l'idx {id} ")
+        triggers_active_day = []
+        
+        for j, k in enumerate(triggers):
             print(f"Days = {k['Days']}")
-            if k["Active"] == 'false':
-                continue
-            elif k['Days'] == 128:
+            if k['Days'] == EVERYDAYS:
                 print('Timer actif tous les jours')
-                bin_active_day = '1111111'
-            elif k['Days'] == 256:
+                bin_active_day = SUM_EVERYDAYS
+            elif k['Days'] == WEEKDAYS:
                 print('Timer actif jours de semaine')
-                bin_active_day = '0011111'
-            elif k['Days'] == 512:
+                bin_active_day = SUM_WEEKDAYS
+            elif k['Days'] == WEEKENDS:
                 print('Timer actif le weekend')
-                bin_active_day = '1100000'
+                bin_active_day = SUM_WEEKENDS
             else:
-                bin_active_day = format(k['Days'], 'b').zfill(7)
-            print(f"Nous somme le {now.weekday()}e jour de la semaine. Valeur Days en binaire = {bin_active_day}")
-            print(f"on regarde l'indice {now.weekday()} de la valeur précédente = {bin_active_day[6 - now.weekday()]}")
-            if bin_active_day[6 - now.weekday()] == '1':
-                timer_day_active.append(j)
+                bin_active_day = int(k['Days'])
+            print(f"Nous somme le {day}e jour de la semaine. Valeur Days en binaire = {2**day}")
+            if bin_active_day & (2**day) :
+                triggers_active_day.append(k)
 
-        if timer_day_active:
-            print(f"ID des timer actifs pour ce jours de la semaine : {timer_day_active}")
-            active_hour(i, timer_day_active, sort_dtimer)
+        if triggers:
+            print(f"ID des timer actifs pour ce jours de la semaine : {triggers_active_day}")
+            active_hour(id, triggers_active_day)
         print('')
         # ballayer les heure pour trouver l'heure active
 
 
-def update_str_time_idx(index, timer, id_list):
-    a = id_list[index]
-    str_time = datetime.strptime(timer[a]['Time'], '%H:%M')
-    return str_time
+def strToTime(trigger):
+    return datetime.strptime(trigger['Time'], '%H:%M').time()
 
 
-def active_hour(device_id, act_days, timer):
-    print(f"longueur de active day = {len(act_days)}")
+def active_hour(device_id, triggers):
+    print(f"Nb déclencheurs = {len(triggers)}")
     m = 0
-    if len(act_days) > 1:
-        while not (update_str_time_idx(m, timer, act_days).time() <= now.time() <= update_str_time_idx(m + 1, timer,
-                                                                                                       act_days).time()):
-            print(
-                f" i = {m}, a = {act_days[m]}, now time = {now.time()}, str_time = {update_str_time_idx(m, timer, act_days).time()}")
-            if m + 2 < len(act_days):
+    nw = now.time()
+    if len(triggers) > 1:
+        while not (strToTime(triggers[m]) <= nw <= strToTime(triggers[m+1])):
+            #print(f" i = {m}, a = {triggers[m]}, now time = {nw}, str_time = {strToTime(triggers[m])}")
+            if m + 2 < len(triggers):
                 m = m + 1
             else:
                 m = m + 1
                 break
 
-    print(f" i = {m}, a = {act_days[m]}, now time = {now.time()}, str_time = {update_str_time_idx(m, timer, act_days).time()}")
-    print(f"level : {timer[act_days[m]]['Level']}")
-    update_device(str(device_id), str(timer[act_days[m]]['Level']))
+    print(f" i = {m}, a = {triggers[m]}, now time = {nw}, str_time = {strToTime(triggers[m])}")
+    update_device(str(device_id), triggers[m])
 
 
 idx = get_timer_list()
