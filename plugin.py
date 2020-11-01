@@ -164,6 +164,10 @@ class BasePlugin:
         Domoticz.Heartbeat(30)
         DumpConfigToLog()                                
 
+        if (len(Devices) == 0):
+            Domoticz.Device(Name="SynchronizeDevices", Unit=1, TypeName="Push On").Create()
+            Domoticz.Log("Device " + Devices[1].Name + " created")
+
         self.get_timer_list(Parameters["Address"],Parameters["Port"])
             
     def onStop(self):
@@ -172,8 +176,9 @@ class BasePlugin:
 #    def onHeartbeat(self):     
 #        Domoticz.Debug("onHeartbeat")
 
-#    def onCommand(self, Unit, Command, Level, Hue):
-#        Domoticz.Debug("Data:" + str(Data))
+    def onCommand(self, Unit, Command, Level, Hue):
+        Domoticz.Debug(f"Unit:{Unit}, Command:{Command}")
+        self.get_timer_list(Parameters["Address"],Parameters["Port"])
        
     def onDisconnect(self, Connection):
         Domoticz.Log("Device has disconnected")
@@ -199,9 +204,9 @@ def onStop():
 #    global _plugin
 #    _plugin.onMessage(Connection, Data)
 
-#def onCommand(Unit, Command, Level, Hue):
-#    global _plugin
-#    _plugin.onCommand(Unit, Command, Level, Hue)
+def onCommand(Unit, Command, Level, Hue):
+    global _plugin
+    _plugin.onCommand(Unit, Command, Level, Hue)
 
 #def onHeartbeat():
 #    global _plugin
