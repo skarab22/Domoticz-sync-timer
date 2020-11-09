@@ -1,1 +1,5 @@
+# Computing directories
+/.*
+
+# Virtual env directory
 /venv/
